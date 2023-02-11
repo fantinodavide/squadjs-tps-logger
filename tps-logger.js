@@ -88,7 +88,7 @@ export default class TpsLogger extends DiscordBasePlugin {
 
     async tickRateUpdated(dt) {
         this.verbose(1, 'TPS Update', dt)
-        this.tickRates.push({ tickRate: dt.tickRate, time: dt.time, events: [] })
+        this.tickRates.push({ tickRate: dt.tickRate, time: dt.time, playerCount: this.server.players.length, layer: this.server.currentLayer.layerid, events: [] })
         if (this.tickRates.length > this.options.tpsHistoryLength) this.tickRates.shift();
     }
 
@@ -118,7 +118,7 @@ export default class TpsLogger extends DiscordBasePlugin {
             "DEPLOYABLE_DAMAGED",
             "ROUND_ENDED"
         ]
-        
+
         for (const e of events) {
             this.verbose(1, "Binding", e)
             this.server.on(e, (data) => { this.pushEventInTpsHistory(e, data) })
