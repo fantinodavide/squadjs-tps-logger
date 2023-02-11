@@ -31,7 +31,7 @@ export default class TpsLogger extends DiscordBasePlugin {
             tpsHistoryLength: {
                 required: false,
                 description: "",
-                default: 30
+                default: 50
             }
         };
     }
@@ -110,9 +110,15 @@ export default class TpsLogger extends DiscordBasePlugin {
             "PLAYER_WOUNDED",
             "PLAYER_CONTROLLER_CONNECTED",
             "ROUND_ENDED",
-            ...this.server.eventNames().filter(e => !e.includes(':'))
+            "NEW_GAME",
+            "PLAYER_SQUAD_CHANGE",
+            "TEAMKILL",
+            "PLAYER_CONNECTED",
+            "CHAT_MESSAGE",
+            "DEPLOYABLE_DAMAGED",
+            "ROUND_ENDED"
         ]
-
+        
         for (const e of events) {
             this.verbose(1, "Binding", e)
             this.server.on(e, (data) => { this.pushEventInTpsHistory(e, data) })
