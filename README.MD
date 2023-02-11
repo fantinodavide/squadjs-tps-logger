@@ -10,6 +10,7 @@ TPS Logger plugin for SquadJS.
     "channelID": "112233445566778899",
     "httpServerEnabled": true,
     "httpServerPort": 3030,
-    "tpsHistoryLength": 30
+    "tpsHistoryLength": 30,
+    "simulateTpsDrops": false
 }
 ```
