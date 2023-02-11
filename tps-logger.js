@@ -41,19 +41,21 @@ export default class TpsLogger extends DiscordBasePlugin {
 
         this.tickRates = []
 
-        this.upgradeEmitter = this.upgradeEmitter.bind(this)
         this.tickRateUpdated = this.tickRateUpdated.bind(this)
         this.httpServer = this.httpServer.bind(this)
+        this.pushEventInTpsHistory = this.pushEventInTpsHistory.bind(this)
+        this.bindListeners = this.bindListeners.bind(this);
 
         this.broadcast = this.server.rcon.broadcast;
         this.warn = this.server.rcon.warn;
     }
 
     async mount() {
-        this.upgradeEmitter();
+        this.bindListeners();
         this.httpServer();
 
         this.server.on('TICK_RATE', this.tickRateUpdated)
+        // this.server.on('CHAT_MESSAGE', (...a) => { console.log(...a) })
     }
 
     async unmount() {
@@ -77,21 +79,43 @@ export default class TpsLogger extends DiscordBasePlugin {
         }
     }
 
-    upgradeEmitter() {
-        const _emit = this.server.emit;
-        this.server.emit = (eventName, data, ...more) => {
-            this.verbose(1, 'Event', eventName)
-            this.tickRates[ this.tickRates.length - 1 ].events.push({ eventName: eventName, data: data })
-
-            return _emit(eventName, data, ...more)
-        }
-
-        this.verbose(1, 'EventEmitter Upgraded')
+    pushEventInTpsHistory(name, data) {
+        // console.log(more)
+        const index = this.tickRates.length == 0 ? 0 : this.tickRates.length - 1;
+        if (!this.tickRates[ index ]) this.tickRates[ index ] = { tickRate: 0, time: 0, events: [] }
+        this.tickRates[ index ].events.push({ eventName: name, data: data })
     }
 
     async tickRateUpdated(dt) {
         this.verbose(1, 'TPS Update', dt)
         this.tickRates.push({ tickRate: dt.tickRate, time: dt.time, events: [] })
         if (this.tickRates.length > this.options.tpsHistoryLength) this.tickRates.shift();
+    }
+
+    bindListeners() {
+        const events = [
+            "ADMIN_BROADCAST",
+            "CLIENT_CONNECTED",
+            "CLIENT_LOGIN",
+            "DEPLOYABLE_DAMAGED",
+            "NEW_GAME",
+            "PENDING_CONNECTION_DESTROYED",
+            "PLAYER_CONNECTED",
+            "PLAYER_DAMAGED",
+            "PLAYER_DIED",
+            "PLAYER_DISCONNECTED",
+            "PLAYER_POSSESS",
+            "PLAYER_REVIVED",
+            "PLAYER_UNPOSSESS",
+            "PLAYER_WOUNDED",
+            "PLAYER_CONTROLLER_CONNECTED",
+            "ROUND_ENDED",
+            ...this.server.eventNames().filter(e => !e.includes(':'))
+        ]
+
+        for (const e of events) {
+            this.verbose(1, "Binding", e)
+            this.server.on(e, (data) => { this.pushEventInTpsHistory(e, data) })
+        }
     }
 }
