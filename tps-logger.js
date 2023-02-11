@@ -35,6 +35,11 @@ export default class TpsLogger extends DiscordBasePlugin {
                 required: false,
                 description: "",
                 default: 200
+            },
+            simulateTpsDrops: {
+                required: false,
+                description: "",
+                default: false
             }
         };
     }
@@ -104,7 +109,7 @@ export default class TpsLogger extends DiscordBasePlugin {
 
     tickRateUpdated(dt) {
         this.verbose(1, 'TPS Update', dt)
-        const tps = Math.floor(Math.random() * 2) == 1 ? 25 : dt.tickRate;
+        const tps = this.options.simulateTpsDrops && Math.floor(Math.random() * 2) == 1 ? 25 : dt.tickRate;
         this.tickRates.push({
             tickRate: tps,
             averageTickRate: 0,
