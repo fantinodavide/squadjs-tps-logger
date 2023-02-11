@@ -67,6 +67,7 @@ export default class TpsLogger extends DiscordBasePlugin {
             let error = false;
             try {
                 http.createServer((req, res) => {
+                    res.setHeader('Content-Type', 'application/json');
                     res.write(JSON.stringify(this.tickRates, null, 2));
                     res.end();
                 }).listen(this.options.httpServerPort);
