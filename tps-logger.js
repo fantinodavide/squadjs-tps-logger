@@ -1,4 +1,7 @@
 import DiscordBasePlugin from './discord-base-plugin.js';
+import LogParser from '../../core/log-parser/index.js';
+
+import async from 'async';
 import * as http from 'http';
 
 export default class TpsLogger extends DiscordBasePlugin {
@@ -31,7 +34,7 @@ export default class TpsLogger extends DiscordBasePlugin {
             tpsHistoryLength: {
                 required: false,
                 description: "",
-                default: 50
+                default: 200
             }
         };
     }
@@ -39,23 +42,36 @@ export default class TpsLogger extends DiscordBasePlugin {
     constructor(server, options, connectors) {
         super(server, options, connectors);
 
+        // LogParser.prototype.orProcessLine = LogParser.prototype.processLine;
+        this.orProcessLine = this.server.logParser.processLine;
+
         this.tickRates = []
 
-        this.tickRateUpdated = this.tickRateUpdated.bind(this)
-        this.httpServer = this.httpServer.bind(this)
-        this.pushEventInTpsHistory = this.pushEventInTpsHistory.bind(this)
+        this.tickRateUpdated = this.tickRateUpdated.bind(this);
+        this.httpServer = this.httpServer.bind(this);
+        this.pushEventInTpsHistory = this.pushEventInTpsHistory.bind(this);
         this.bindListeners = this.bindListeners.bind(this);
+        this.logLineReceived = this.logLineReceived.bind(this);
+        this.getLatestTpsRecord = this.getLatestTpsRecord.bind(this);
+        this.pushLogInTpsHistory = this.pushLogInTpsHistory.bind(this);
+        this.getAverageTps = this.getAverageTps.bind(this);
+        this.clearLogHistoryInTpsRecord = this.clearLogHistoryInTpsRecord.bind(this);
+        this.canClearLog = this.canClearLog.bind(this);
+        this.upgradeProcessLine = this.upgradeProcessLine.bind(this);
+        this.upgradedProcessLine = this.upgradedProcessLine.bind(this);
 
         this.broadcast = this.server.rcon.broadcast;
         this.warn = this.server.rcon.warn;
+
+        this.upgradeProcessLine();
     }
 
     async mount() {
-        this.bindListeners();
+        // this.bindListeners();
+        console.log(this.server.logParser.processLine)
         this.httpServer();
 
         this.server.on('TICK_RATE', this.tickRateUpdated)
-        // this.server.on('CHAT_MESSAGE', (...a) => { console.log(...a) })
     }
 
     async unmount() {
@@ -81,16 +97,85 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     pushEventInTpsHistory(name, data) {
-        // console.log(more)
         const index = this.tickRates.length == 0 ? 0 : this.tickRates.length - 1;
-        if (!this.tickRates[ index ]) this.tickRates[ index ] = { tickRate: 0, time: 0, events: [] }
+        if (!this.tickRates[ index ]) return;
         this.tickRates[ index ].events.push({ eventName: name, data: data })
     }
 
-    async tickRateUpdated(dt) {
+    tickRateUpdated(dt) {
         this.verbose(1, 'TPS Update', dt)
-        this.tickRates.push({ tickRate: dt.tickRate, time: dt.time, playerCount: this.server.players.length, layer: this.server.currentLayer.layerid, events: [] })
+        const tps = Math.floor(Math.random() * 2) == 1 ? 25 : dt.tickRate;
+        this.tickRates.push({
+            tickRate: tps,
+            averageTickRate: 0,
+            time: dt.time,
+            playerCount: this.server.players.length,
+            layer: this.server.currentLayer.layerid,
+            events: [],
+            logs: {
+                count: 0,
+                history: []
+            }
+        })
+
         if (this.tickRates.length > this.options.tpsHistoryLength) this.tickRates.shift();
+
+        const latestTpsRecordIndex = this.getLatestTpsRecord();
+        this.tickRates[ latestTpsRecordIndex ].averageTickRate = this.getAverageTps();
+        this.clearLogHistoryInTpsRecord(latestTpsRecordIndex - 1)
+    }
+
+    async logLineReceived(dt) {
+        this.verbose(2, `Received log line`, dt)
+        this.pushLogInTpsHistory(dt)
+    }
+
+    pushLogInTpsHistory(log) {
+        this.verbose(1, `Adding log to tps history`)
+        const index = this.getLatestTpsRecord();
+        if (!this.tickRates[ index ]) return;
+        this.tickRates[ index ].logs.history.push(log);
+        this.tickRates[ index ].logs.count++;
+    }
+
+    clearLogHistoryInTpsRecord(tpsRecordIndex) {
+        this.verbose(1, `Checking permission to clear log history ${tpsRecordIndex}`)
+        if (tpsRecordIndex < 0 || tpsRecordIndex >= this.tickRates.length) return;
+        if (!this.canClearLog(tpsRecordIndex)) return;
+        this.verbose(1, `Clearing log history ${tpsRecordIndex}`)
+        this.tickRates[ tpsRecordIndex ].logs.history = [];
+    }
+
+    canClearLog(tpsRecordIndex) {
+        // this.verbose(1, `Tickrate length:`, this.tickRates.length)
+        // this.verbose(1, `Prev tickrate *0.75`, this.tickRates[ tpsRecordIndex - 1 ].tickRate * 0.75)
+        // this.verbose(1, `Prev cond`, this.tickRates[ tpsRecordIndex - 1 ].tickRate * 0.75 < this.tickRates[ tpsRecordIndex ].tickRate)
+        // this.verbose(1, `Next cond`, this.tickRates[ tpsRecordIndex ].tickRate * 0.75 < this.tickRates[ tpsRecordIndex + 1 ].tickRate)
+        return (
+            this.tickRates.length > 1 &&
+            this.tickRates[ tpsRecordIndex - 1 ].tickRate * 0.75 < this.tickRates[ tpsRecordIndex ].tickRate &&
+            this.tickRates[ tpsRecordIndex ].tickRate * 0.75 < this.tickRates[ tpsRecordIndex + 1 ].tickRate
+        )
+    }
+
+    getLatestTpsRecord() {
+        return this.tickRates.length == 0 ? 0 : this.tickRates.length - 1;
+    }
+
+    getAverageTps() {
+        return this.tickRates.map(t => t.tickRate).reduce((acc, cur) => acc + cur, 0) / this.tickRates.length || 0
+    }
+
+    async upgradeProcessLine() {
+        LogParser.prototype.processLine = this.upgradedProcessLine
+        await this.server.restartLogParser();
+        this.verbose(1, `Upgraded LogParser.processLine()`)
+    }
+
+    async upgradedProcessLine(line) {
+        // LogParser.prototype.orProcessLine.bind(this.server.logParser)(line) // working (?)
+        this.orProcessLine.bind(this.server.logParser)(line)
+        this.logLineReceived(line);
     }
 
     bindListeners() {
