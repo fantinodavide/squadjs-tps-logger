@@ -73,7 +73,7 @@ export default class TpsLogger extends DiscordBasePlugin {
 
     async mount() {
         // this.bindListeners();
-        console.log(this.server.logParser.processLine)
+        // console.log(this.server.logParser.processLine)
         this.httpServer();
 
         this.server.on('TICK_RATE', this.tickRateUpdated)
@@ -108,7 +108,7 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     tickRateUpdated(dt) {
-        this.verbose(1, 'TPS Update', dt)
+        this.verbose(1, 'TPS Update', dt.tickRate, dt.time)
         const tps = this.options.simulateTpsDrops && Math.floor(Math.random() * 2) == 1 ? 25 : dt.tickRate;
         this.tickRates.push({
             tickRate: tps,
@@ -136,7 +136,7 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     pushLogInTpsHistory(log) {
-        this.verbose(1, `Adding log to tps history`)
+        // this.verbose(2, `Adding log to tps history`)
         const index = this.getLatestTpsRecord();
         if (!this.tickRates[ index ]) return;
         this.tickRates[ index ].logs.history.push(log);
@@ -144,10 +144,10 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     clearLogHistoryInTpsRecord(tpsRecordIndex) {
-        this.verbose(1, `Checking permission to clear log history ${tpsRecordIndex}`)
+        this.verbose(2, `Checking permission to clear log history ${tpsRecordIndex}`)
         if (tpsRecordIndex < 0 || tpsRecordIndex >= this.tickRates.length) return;
         if (!this.canClearLog(tpsRecordIndex)) return;
-        this.verbose(1, `Clearing log history ${tpsRecordIndex}`)
+        this.verbose(2, `Clearing log history ${tpsRecordIndex}`)
         this.tickRates[ tpsRecordIndex ].logs.history = [];
     }
 
@@ -168,7 +168,7 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     getAverageTps() {
-        return this.tickRates.map(t => t.tickRate).reduce((acc, cur) => acc + cur, 0) / this.tickRates.length || 0
+        return this.tickRates.slice(this.tickRates.length-Math.min(this.tickRates.length,10)).map(t => t.tickRate).reduce((acc, cur) => acc + cur, 0) / this.tickRates.length || 0
     }
 
     async upgradeProcessLine() {
