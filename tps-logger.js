@@ -168,7 +168,8 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     getAverageTps() {
-        return this.tickRates.slice(this.tickRates.length-Math.min(this.tickRates.length,10)).map(t => t.tickRate).reduce((acc, cur) => acc + cur, 0) / this.tickRates.length || 0
+        const sliceLength = Math.min(this.tickRates.length, 10);
+        return this.tickRates.slice(this.tickRates.length - sliceLength).map(t => t.tickRate).reduce((acc, cur) => acc + cur, 0) / sliceLength || 0
     }
 
     async upgradeProcessLine() {
