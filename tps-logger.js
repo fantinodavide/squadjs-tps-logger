@@ -1,6 +1,7 @@
 import DiscordBasePlugin from './discord-base-plugin.js';
 import SocketIOAPI from './socket-io-api.js';
 import LogParser from '../../core/log-parser/index.js';
+import { MessageAttachment } from "discord.js";
 
 import async from 'async';
 import * as http from 'http';
@@ -17,6 +18,12 @@ export default class TpsLogger extends DiscordBasePlugin {
     static get optionsSpecification() {
         return {
             ...DiscordBasePlugin.optionsSpecification,
+            channelID: {
+                required: true,
+                description: 'The ID of the channel to send logs to.',
+                default: '',
+                example: '667741905228136459'
+            },
             commandPrefix: {
                 required: false,
                 description: "Prefix of every in-game command",
@@ -76,6 +83,7 @@ export default class TpsLogger extends DiscordBasePlugin {
         this.upgradeProcessLine = this.upgradeProcessLine.bind(this);
         this.upgradedProcessLine = this.upgradedProcessLine.bind(this);
         this.matchProfilerLog = this.matchProfilerLog.bind(this);
+        this.roundEnded = this.roundEnded.bind(this);
 
         this.broadcast = this.server.rcon.broadcast;
         this.warn = this.server.rcon.warn;
@@ -89,10 +97,35 @@ export default class TpsLogger extends DiscordBasePlugin {
         this.httpServer();
 
         this.server.on('TICK_RATE', this.tickRateUpdated)
+        this.server.on('ROUND_ENDED', this.roundEnded)
+
+        // setTimeout(this.roundEnded, 2000)
     }
 
     async unmount() {
         this.verbose(1, 'TpsLogger unmounted');
+    }
+
+    async roundEnded(info) {
+        await this.sendDiscordMessage({
+            embed: {
+                title: `TPS Logs`,
+                fields: [
+                    {
+                        name: 'LayerID',
+                        value: this.tickRates[ this.getLatestTpsRecord() ].layer,
+                        inline: false
+                    },
+                ]
+            },
+            timestamp: (new Date()).toISOString()
+        });
+        await this.sendDiscordMessage({
+            files: [
+                new MessageAttachment(Buffer.from(JSON.stringify(this.tickRates, null, 2)), 'TPS_History.json')
+            ]
+        })
+        this.tickRates = [];
     }
 
     httpServer() {
