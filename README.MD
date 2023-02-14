@@ -12,7 +12,7 @@ TPS Logger plugin for SquadJS.
     "useSocketIoPluginHttpServer": true,
     "outputHttpPath": "tpslogs",
     "httpServerPort": 3030,
-    "tpsHistoryLength": 30,
+    "tpsHistoryLength": 720,
     "simulateTpsDrops": false
 }
 ```

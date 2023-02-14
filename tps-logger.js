@@ -52,7 +52,7 @@ export default class TpsLogger extends DiscordBasePlugin {
             tpsHistoryLength: {
                 required: false,
                 description: "",
-                default: 200
+                default: 720
             },
             simulateTpsDrops: {
                 required: false,
