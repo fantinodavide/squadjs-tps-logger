@@ -9,6 +9,8 @@ TPS Logger plugin for SquadJS.
     "discordClient": "discord",
     "channelID": "112233445566778899",
     "httpServerEnabled": true,
+    "useSocketIoPluginHttpServer": true,
+    "outputHttpPath": "tpslogs",
     "httpServerPort": 3030,
     "tpsHistoryLength": 30,
     "simulateTpsDrops": false
