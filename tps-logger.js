@@ -100,7 +100,9 @@ export default class TpsLogger extends DiscordBasePlugin {
                 let socketIo = this.server.plugins.find(p => p instanceof SocketIOAPI);
 
                 socketIo.httpServer.on('request', async (req, res) => {
-                    if (req.method == 'GET' && req.url == this.options.outputHttpPath) {
+                    this.verbose(2, 'Request', req.url)
+                    if (req.method == 'GET' && req.url == '/' + this.options.outputHttpPath.replace(/^\//, '')) {
+                        this.verbose(1, `Sending response to "${req.url}"`)
                         res.setHeader('Content-Type', 'application/json');
                         res.write(JSON.stringify(this.tickRates, null, 2))
                         res.end();
