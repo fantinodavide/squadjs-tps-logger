@@ -75,6 +75,7 @@ export default class TpsLogger extends DiscordBasePlugin {
         this.canClearLog = this.canClearLog.bind(this);
         this.upgradeProcessLine = this.upgradeProcessLine.bind(this);
         this.upgradedProcessLine = this.upgradedProcessLine.bind(this);
+        this.matchProfilerLog = this.matchProfilerLog.bind(this);
 
         this.broadcast = this.server.rcon.broadcast;
         this.warn = this.server.rcon.warn;
@@ -239,6 +240,14 @@ export default class TpsLogger extends DiscordBasePlugin {
         for (const e of events) {
             this.verbose(1, "Binding", e)
             this.server.on(e, (data) => { this.pushEventInTpsHistory(e, data) })
+        }
+    }
+
+    matchProfilerLog(line) {
+        const regex = /LogCsvProfiler\: Display\: Capture (?<state>\w+)(. CSV ID: (?<csv_id>\w+))?(. Writing CSV to file : (?<csv_file_path>.+))?/
+        const match = line.match(regex);
+        if (match) {
+            this.server.emit(`CSV_PROFILER_${match.groups.state.toUpperCase()}`, match)
         }
     }
 }
