@@ -159,6 +159,7 @@ export default class TpsLogger extends DiscordBasePlugin {
     async logLineReceived(dt) {
         this.verbose(2, `Received log line`, dt)
         this.pushLogInTpsHistory(dt)
+        this.matchProfilerLog(dt);
     }
 
     pushLogInTpsHistory(log) {
