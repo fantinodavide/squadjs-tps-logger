@@ -1,4 +1,5 @@
 import DiscordBasePlugin from './discord-base-plugin.js';
+import SocketIOAPI from './socket-io-api.js';
 import LogParser from '../../core/log-parser/index.js';
 
 import async from 'async';
@@ -25,6 +26,16 @@ export default class TpsLogger extends DiscordBasePlugin {
                 required: true,
                 description: "Enables/Disables the http server that hosts the TPS history with events",
                 default: false
+            },
+            useSocketIoPluginHttpServer: {
+                required: false,
+                description: 'If set to true the output will be served over the HTTP server started by the Socket-io SquadJS plugin.',
+                default: true
+            },
+            outputHttpPath: {
+                required: false,
+                description: '',
+                default: "/tpslogs"
             },
             httpServerPort: {
                 required: false,
@@ -85,19 +96,31 @@ export default class TpsLogger extends DiscordBasePlugin {
 
     httpServer() {
         if (this.options.httpServerEnabled) {
-            let error = false;
-            try {
-                http.createServer((req, res) => {
-                    res.setHeader('Content-Type', 'application/json');
-                    res.write(JSON.stringify(this.tickRates, null, 2));
-                    res.end();
-                }).listen(this.options.httpServerPort);
-            } catch (e) {
-                error = e;
-                this.verbose(1, `Could not start the HTTP server. Error:`, e)
-            }
+            if (this.options.useSocketIoPluginHttpServer) {
+                let socketIo = this.server.plugins.find(p => p instanceof SocketIOAPI);
 
-            if (!error) this.verbose(1, `HTTP server started on port ${this.options.httpServerPort}`)
+                socketIo.httpServer.on('request', async (req, res) => {
+                    if (req.method == 'GET' && req.url == this.options.outputHttpPath) {
+                        res.setHeader('Content-Type', 'application/json');
+                        res.write(JSON.stringify(this.tickRates, null, 2))
+                        res.end();
+                    }
+                })
+            } else {
+                let error = false;
+                try {
+                    http.createServer((req, res) => {
+                        res.setHeader('Content-Type', 'application/json');
+                        res.write(JSON.stringify(this.tickRates, null, 2));
+                        res.end();
+                    }).listen(this.options.httpServerPort);
+                } catch (e) {
+                    error = e;
+                    this.verbose(1, `Could not start the HTTP server. Error:`, e)
+                }
+
+                if (!error) this.verbose(1, `HTTP server started on port ${this.options.httpServerPort}`)
+            }
         }
     }
 
