@@ -84,6 +84,7 @@ export default class TpsLogger extends DiscordBasePlugin {
         this.upgradedProcessLine = this.upgradedProcessLine.bind(this);
         this.matchProfilerLog = this.matchProfilerLog.bind(this);
         this.roundEnded = this.roundEnded.bind(this);
+        this.isTpsDrop = this.isTpsDrop.bind(this);
 
         this.broadcast = this.server.rcon.broadcast;
         this.warn = this.server.rcon.warn;
@@ -167,8 +168,8 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     tickRateUpdated(dt) {
-        this.verbose(1, 'TPS Update', dt.tickRate, dt.time)
         const tps = this.options.simulateTpsDrops && Math.floor(Math.random() * 2) == 1 ? 25 : dt.tickRate;
+        this.verbose(1, 'TPS Update', tps, dt.time)
         this.tickRates.push({
             tickRate: tps,
             averageTickRate: 0,
@@ -186,7 +187,16 @@ export default class TpsLogger extends DiscordBasePlugin {
 
         const latestTpsRecordIndex = this.getLatestTpsRecord();
         this.tickRates[ latestTpsRecordIndex ].averageTickRate = this.getAverageTps();
+        this.tickRates[ latestTpsRecordIndex ].id = latestTpsRecordIndex;
+        if (this.isTpsDrop(latestTpsRecordIndex)) {
+            this.verbose(1, 'Emitting TPS_DROP event')
+            this.server.emit('TPS_DROP', this.tickRates[ latestTpsRecordIndex ])
+        }
         this.clearLogHistoryInTpsRecord(latestTpsRecordIndex - 1)
+    }
+
+    isTpsDrop(latestTpsRecordIndex) {
+        return this.tickRates[ latestTpsRecordIndex - 1 ].tickRate * 0.75 > this.tickRates[ latestTpsRecordIndex ].tickRate
     }
 
     async logLineReceived(dt) {
@@ -281,7 +291,9 @@ export default class TpsLogger extends DiscordBasePlugin {
         const regex = /LogCsvProfiler\: Display\: Capture (?<state>\w+)(. CSV ID: (?<csv_id>\w+))?(. Writing CSV to file : (?<csv_file_path>.+))?/
         const match = line.match(regex);
         if (match) {
-            this.server.emit(`CSV_PROFILER_${match.groups.state.toUpperCase()}`, match)
+            const event = `CSV_PROFILER_${match.groups.state.toUpperCase()}`;
+            this.server.emit(event, match)
+            this.verbose(1, 'Emitting event', event)
         }
     }
 }
