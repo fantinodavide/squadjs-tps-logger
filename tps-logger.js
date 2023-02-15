@@ -168,7 +168,8 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     tickRateUpdated(dt) {
-        const tps = this.options.simulateTpsDrops && Math.floor(Math.random() * 2) == 1 ? 25 : dt.tickRate;
+        const prevTps = this.tickRates[ this.getLatestTpsRecord() ]?.tickRate || 50
+        const tps = this.options.simulateTpsDrops && prevTps > 25 ? 25 : dt.tickRate;
         this.verbose(1, 'TPS Update', tps, dt.time)
         this.tickRates.push({
             tickRate: tps,
