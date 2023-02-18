@@ -84,6 +84,7 @@ export default class TpsLogger extends DiscordBasePlugin {
         this.upgradedProcessLine = this.upgradedProcessLine.bind(this);
         this.matchProfilerLog = this.matchProfilerLog.bind(this);
         this.roundEnded = this.roundEnded.bind(this);
+        this.roundStarted = this.roundStarted.bind(this);
         this.isTpsDrop = this.isTpsDrop.bind(this);
 
         this.broadcast = this.server.rcon.broadcast;
@@ -99,6 +100,7 @@ export default class TpsLogger extends DiscordBasePlugin {
 
         this.server.on('TICK_RATE', this.tickRateUpdated)
         this.server.on('ROUND_ENDED', this.roundEnded)
+        this.server.on('NEW_GAME', this.roundStarted)
 
         // setTimeout(this.roundEnded, 2000)
     }
@@ -107,25 +109,55 @@ export default class TpsLogger extends DiscordBasePlugin {
         this.verbose(1, 'TpsLogger unmounted');
     }
 
-    async roundEnded(info) {
+    async roundStarted(info) {
         await this.sendDiscordMessage({
             embed: {
-                title: `TPS Logs`,
+                title: `TPS Logs Started`,
                 fields: [
                     {
                         name: 'LayerID',
-                        value: this.tickRates[ this.getLatestTpsRecord() ].layer,
+                        value: this.server.currentLayer.layerid || 'Unknown',
+                        inline: false
+                    },
+                    {
+                        name: 'Player Count',
+                        value: this.server.players.length,
                         inline: false
                     },
                 ]
             },
             timestamp: (new Date()).toISOString()
         });
+    }
+    async roundEnded(info) {
         await this.sendDiscordMessage({
             files: [
                 new MessageAttachment(Buffer.from(JSON.stringify(this.tickRates, null, 2)), 'TPS_History.json')
             ]
         })
+        await this.sendDiscordMessage({
+            embed: {
+                title: `TPS Logs Ended`,
+                fields: [
+                    {
+                        name: 'LayerID',
+                        value: this.tickRates[ this.getLatestTpsRecord() ].layer,
+                        inline: false
+                    },
+                    {
+                        name: 'Player Count',
+                        value: this.server.players.length,
+                        inline: false
+                    },
+                    {
+                        name: 'Latest Average TPS',
+                        value: this.tickRates[ this.getLatestTpsRecord() ].averageTickRate,
+                        inline: false
+                    },
+                ]
+            },
+            timestamp: (new Date()).toISOString()
+        });
         this.tickRates = [];
     }
 
@@ -289,10 +321,18 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     matchProfilerLog(line) {
-        const regex = /LogCsvProfiler\: Display\: Capture (?<state>\w+)(. CSV ID: (?<csv_id>\w+))?(. Writing CSV to file : (?<csv_file_path>.+))?/
-        const match = line.match(regex);
+        let regex = /LogCsvProfiler\: Display\: Capture (?<state>\w+)(. CSV ID: (?<csv_id>\w+))?(. Writing CSV to file : (?<csv_file_path>.+))?/
+        let match = line.match(regex);
         if (match) {
             const event = `CSV_PROFILER_${match.groups.state.toUpperCase()}`;
+            this.server.emit(event, match)
+            this.verbose(1, 'Emitting event', event)
+        }
+
+        regex = /LogCsvProfiler: Warning: Capture Stop requested, but no capture was running!/
+        match = line.match(regex);
+        if (match) {
+            const event = `CSV_PROFILER_ALREADY_STOPPED`;
             this.server.emit(event, match)
             this.verbose(1, 'Emitting event', event)
         }
