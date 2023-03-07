@@ -65,9 +65,6 @@ export default class TpsLogger extends DiscordBasePlugin {
     constructor(server, options, connectors) {
         super(server, options, connectors);
 
-        // LogParser.prototype.orProcessLine = LogParser.prototype.processLine;
-        this.orProcessLine = this.server.logParser.processLine;
-
         this.tickRates = []
 
         this.tickRateUpdated = this.tickRateUpdated.bind(this);
@@ -80,8 +77,6 @@ export default class TpsLogger extends DiscordBasePlugin {
         this.getAverageTps = this.getAverageTps.bind(this);
         this.clearLogHistoryInTpsRecord = this.clearLogHistoryInTpsRecord.bind(this);
         this.canClearLog = this.canClearLog.bind(this);
-        this.upgradeProcessLine = this.upgradeProcessLine.bind(this);
-        this.upgradedProcessLine = this.upgradedProcessLine.bind(this);
         this.matchProfilerLog = this.matchProfilerLog.bind(this);
         this.roundEnded = this.roundEnded.bind(this);
         this.roundStarted = this.roundStarted.bind(this);
@@ -89,18 +84,17 @@ export default class TpsLogger extends DiscordBasePlugin {
 
         this.broadcast = this.server.rcon.broadcast;
         this.warn = this.server.rcon.warn;
-
-        this.upgradeProcessLine();
     }
 
     async mount() {
-        // this.bindListeners();
-        // console.log(this.server.logParser.processLine)
+        this.server.logParser.logReader.reader.on('line', this.logLineReceived)
+        
         this.httpServer();
 
         this.server.on('TICK_RATE', this.tickRateUpdated)
         this.server.on('ROUND_ENDED', this.roundEnded)
         this.server.on('NEW_GAME', this.roundStarted)
+        
 
         // setTimeout(this.roundEnded, 2000)
     }
@@ -130,35 +124,39 @@ export default class TpsLogger extends DiscordBasePlugin {
         });
     }
     async roundEnded(info) {
-        await this.sendDiscordMessage({
-            files: [
-                new MessageAttachment(Buffer.from(JSON.stringify(this.tickRates, null, 2)), 'TPS_History.json')
-            ]
-        })
-        await this.sendDiscordMessage({
-            embed: {
-                title: `TPS Logs Ended`,
-                fields: [
-                    {
-                        name: 'LayerID',
-                        value: this.tickRates[ this.getLatestTpsRecord() ].layer,
-                        inline: false
-                    },
-                    {
-                        name: 'Player Count',
-                        value: this.server.players.length,
-                        inline: false
-                    },
-                    {
-                        name: 'Latest Average TPS',
-                        value: this.tickRates[ this.getLatestTpsRecord() ].averageTickRate,
-                        inline: false
-                    },
+        setTimeout(async () => {
+            const latestTickrate = this.tickRates[ this.getLatestTpsRecord() ];
+            const latestPlayerCount = this.server.players.length;
+            await this.sendDiscordMessage({
+                files: [
+                    new MessageAttachment(Buffer.from(JSON.stringify(this.tickRates, null, 2)), 'TPS_History.json')
                 ]
-            },
-            timestamp: (new Date()).toISOString()
-        });
-        this.tickRates = [];
+            })
+            this.tickRates = [];
+            await this.sendDiscordMessage({
+                embed: {
+                    title: `TPS Logs Ended`,
+                    fields: [
+                        {
+                            name: 'LayerID',
+                            value: latestTickrate.layer,
+                            inline: false
+                        },
+                        {
+                            name: 'Player Count',
+                            value: latestPlayerCount,
+                            inline: false
+                        },
+                        {
+                            name: 'Latest Average TPS',
+                            value: latestTickrate.averageTickRate,
+                            inline: false
+                        },
+                    ]
+                },
+                timestamp: (new Date()).toISOString()
+            });
+        }, 10 * 1000)
     }
 
     httpServer() {
@@ -273,18 +271,6 @@ export default class TpsLogger extends DiscordBasePlugin {
     getAverageTps() {
         const sliceLength = Math.min(this.tickRates.length, 10);
         return this.tickRates.slice(this.tickRates.length - sliceLength).map(t => t.tickRate).reduce((acc, cur) => acc + cur, 0) / sliceLength || 0
-    }
-
-    async upgradeProcessLine() {
-        LogParser.prototype.processLine = this.upgradedProcessLine
-        await this.server.restartLogParser();
-        this.verbose(1, `Upgraded LogParser.processLine()`)
-    }
-
-    async upgradedProcessLine(line) {
-        // LogParser.prototype.orProcessLine.bind(this.server.logParser)(line) // working (?)
-        this.orProcessLine.bind(this.server.logParser)(line)
-        this.logLineReceived(line);
     }
 
     bindListeners() {
