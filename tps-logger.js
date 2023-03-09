@@ -130,35 +130,39 @@ export default class TpsLogger extends DiscordBasePlugin {
         });
     }
     async roundEnded(info) {
-        await this.sendDiscordMessage({
-            files: [
-                new MessageAttachment(Buffer.from(JSON.stringify(this.tickRates, null, 2)), 'TPS_History.json')
-            ]
-        })
-        await this.sendDiscordMessage({
-            embed: {
-                title: `TPS Logs Ended`,
-                fields: [
-                    {
-                        name: 'LayerID',
-                        value: this.tickRates[ this.getLatestTpsRecord() ].layer,
-                        inline: false
-                    },
-                    {
-                        name: 'Player Count',
-                        value: this.server.players.length,
-                        inline: false
-                    },
-                    {
-                        name: 'Latest Average TPS',
-                        value: this.tickRates[ this.getLatestTpsRecord() ].averageTickRate,
-                        inline: false
-                    },
+        setTimeout(async () => {
+            const latestTickrate = this.tickRates[ this.getLatestTpsRecord() ];
+            const latestPlayerCount = this.server.players.length;
+            await this.sendDiscordMessage({
+                files: [
+                    new MessageAttachment(Buffer.from(JSON.stringify(this.tickRates, null, 2)), 'TPS_History.json')
                 ]
-            },
-            timestamp: (new Date()).toISOString()
-        });
-        this.tickRates = [];
+            })
+            this.tickRates = [];
+            await this.sendDiscordMessage({
+                embed: {
+                    title: `TPS Logs Ended`,
+                    fields: [
+                        {
+                            name: 'LayerID',
+                            value: latestTickrate.layer,
+                            inline: false
+                        },
+                        {
+                            name: 'Player Count',
+                            value: latestPlayerCount,
+                            inline: false
+                        },
+                        {
+                            name: 'Latest Average TPS',
+                            value: latestTickrate.averageTickRate,
+                            inline: false
+                        },
+                    ]
+                },
+                timestamp: (new Date()).toISOString()
+            });
+        }, 10 * 1000)
     }
 
     httpServer() {
