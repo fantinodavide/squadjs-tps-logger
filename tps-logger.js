@@ -88,13 +88,13 @@ export default class TpsLogger extends DiscordBasePlugin {
 
     async mount() {
         this.server.logParser.logReader.reader.on('line', this.logLineReceived)
-        
+
         this.httpServer();
 
         this.server.on('TICK_RATE', this.tickRateUpdated)
         this.server.on('ROUND_ENDED', this.roundEnded)
         this.server.on('NEW_GAME', this.roundStarted)
-        
+
 
         // setTimeout(this.roundEnded, 2000)
     }
@@ -104,24 +104,26 @@ export default class TpsLogger extends DiscordBasePlugin {
     }
 
     async roundStarted(info) {
-        await this.sendDiscordMessage({
-            embed: {
-                title: `TPS Logs Started`,
-                fields: [
-                    {
-                        name: 'LayerID',
-                        value: this.server.currentLayer.layerid || 'Unknown',
-                        inline: false
-                    },
-                    {
-                        name: 'Player Count',
-                        value: this.server.players.length,
-                        inline: false
-                    },
-                ]
-            },
-            timestamp: (new Date()).toISOString()
-        });
+        setTimeout(async () => {
+            await this.sendDiscordMessage({
+                embed: {
+                    title: `TPS Logs Started`,
+                    fields: [
+                        {
+                            name: 'LayerID',
+                            value: this.server.currentLayer.layerid || 'Unknown',
+                            inline: false
+                        },
+                        {
+                            name: 'Player Count',
+                            value: this.server.players.length,
+                            inline: false
+                        },
+                    ]
+                },
+                timestamp: (new Date()).toISOString()
+            });
+        }, 20_000)
     }
     async roundEnded(info) {
         setTimeout(async () => {
@@ -156,7 +158,7 @@ export default class TpsLogger extends DiscordBasePlugin {
                 },
                 timestamp: (new Date()).toISOString()
             });
-        }, 10 * 1000)
+        }, 15_000)
     }
 
     httpServer() {
