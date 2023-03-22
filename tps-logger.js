@@ -128,6 +128,8 @@ export default class TpsLogger extends DiscordBasePlugin {
     async roundEnded(info) {
         setTimeout(async () => {
             const latestTickrate = this.tickRates[ this.getLatestTpsRecord() ];
+            if (!latestTickrate) return;
+            
             const latestPlayerCount = this.server.players.length;
             await this.sendDiscordMessage({
                 files: [
