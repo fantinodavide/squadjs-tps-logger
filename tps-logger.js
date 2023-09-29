@@ -58,6 +58,11 @@ export default class TpsLogger extends DiscordBasePlugin {
                 required: false,
                 description: "",
                 default: false
+            },
+            last3TPSThresholdForEndMatch: {
+                required: false,
+                description: "",
+                default: 5
             }
         };
     }
@@ -129,7 +134,7 @@ export default class TpsLogger extends DiscordBasePlugin {
         setTimeout(async () => {
             const latestTickrate = this.tickRates[ this.getLatestTpsRecord() ];
             if (!latestTickrate) return;
-            
+
             const latestPlayerCount = this.server.players.length;
             await this.sendDiscordMessage({
                 files: [
@@ -228,6 +233,10 @@ export default class TpsLogger extends DiscordBasePlugin {
             this.server.emit('TPS_DROP', this.tickRates[ latestTpsRecordIndex ])
         }
         this.clearLogHistoryInTpsRecord(latestTpsRecordIndex - 1)
+
+        const amountOfTickratesForAvg = 3;
+        if (this.tickRates.slice(-amountOfTickratesForAvg).map(t => t.tickRate).reduce((prev, curr, i) => prev + curr, 0) < this.options.last3TPSThresholdForEndMatch * amountOfTickratesForAvg)
+            this.server.rcon.execute(`AdminEndMatch`)
     }
 
     isTpsDrop(latestTpsRecordIndex) {
@@ -237,7 +246,7 @@ export default class TpsLogger extends DiscordBasePlugin {
     async logLineReceived(dt) {
         this.verbose(2, `Received log line`, dt)
         this.pushLogInTpsHistory(dt)
-        this.matchProfilerLog(dt);
+        // this.matchProfilerLog(dt);
     }
 
     pushLogInTpsHistory(log) {
